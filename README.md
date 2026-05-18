@@ -65,11 +65,24 @@ The model was evaluated using:
 - Dropout was used to reduce overfitting
 - Two optimizers were compared for performance analysis
 - Validation split was used during training
+- EarlyStopping was applied to prevent overtraining
+- Data Augmentation was used to improve generalization
+
+---
+
+## 🧪 External Image Prediction
+The trained model can predict handwritten digits from external images by:
+- Converting image to grayscale
+- Resizing to 28x28 pixels
+- Normalizing pixel values
+- Reshaping to match CNN input format
+
+This helps test the model in real-world scenarios.
 
 ---
 
 ## 🚀 How to Run
 
-1. Install dependencies:
+### 1️⃣ Install dependencies
 ```bash
-pip install tensorflow numpy matplotlib
+pip install tensorflow numpy matplotlib seaborn scikit-learn pillow pandas
