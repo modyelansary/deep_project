@@ -11,10 +11,10 @@ from tensorflow.keras.callbacks import EarlyStopping
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 import seaborn as sns
 
 from sklearn.metrics import confusion_matrix
+from PIL import Image, ImageOps
 
 # =====================================
 # LOAD DATASET
@@ -22,22 +22,22 @@ from sklearn.metrics import confusion_matrix
 
 (x_train, y_train), (x_test, y_test) = mnist.load_data()
 
-# Save labels before one-hot
+# Save original labels
 y_test_labels = y_test
 
 # =====================================
 # PREPROCESSING
 # =====================================
 
-# Normalize
+# Normalize images
 x_train = x_train / 255.0
 x_test = x_test / 255.0
 
-# Reshape
+# Reshape for CNN
 x_train = x_train.reshape(-1, 28, 28, 1)
 x_test = x_test.reshape(-1, 28, 28, 1)
 
-# One-hot encoding
+# One-Hot Encoding
 y_train = to_categorical(y_train, 10)
 y_test = to_categorical(y_test, 10)
 
@@ -52,20 +52,21 @@ datagen = ImageDataGenerator(
     height_shift_range=0.1
 )
 
-datagen.fit(x_train)
-
 # =====================================
-# BUILD MODEL
+# BUILD CNN MODEL
 # =====================================
 
 def build_model():
 
     model = models.Sequential()
 
-    # Block 1
+    # =========================
+    # First Convolution Block
+    # =========================
+
     model.add(layers.Conv2D(
-        32,
-        (3,3),
+        filters=32,
+        kernel_size=(3,3),
         activation='relu',
         input_shape=(28,28,1)
     ))
@@ -76,10 +77,13 @@ def build_model():
 
     model.add(layers.Dropout(0.25))
 
-    # Block 2
+    # =========================
+    # Second Convolution Block
+    # =========================
+
     model.add(layers.Conv2D(
-        64,
-        (3,3),
+        filters=64,
+        kernel_size=(3,3),
         activation='relu'
     ))
 
@@ -89,18 +93,27 @@ def build_model():
 
     model.add(layers.Dropout(0.25))
 
-    # Flatten
+    # =========================
+    # Flatten Layer
+    # =========================
+
     model.add(layers.Flatten())
 
-    # Dense
+    # =========================
+    # Fully Connected Layer
+    # =========================
+
     model.add(layers.Dense(
         128,
         activation='relu'
     ))
 
-    model.add(layers.Dropout(0.5))
+    model.add(layers.Dropout(0.3))
 
-    # Output
+    # =========================
+    # Output Layer
+    # =========================
+
     model.add(layers.Dense(
         10,
         activation='softmax'
@@ -119,43 +132,54 @@ early_stop = EarlyStopping(
 )
 
 # =====================================
-# EXPERIMENT 1 -> ADAM
+# BUILD & COMPILE MODEL
 # =====================================
 
-model_adam = build_model()
+model = build_model()
 
-model_adam.compile(
+model.compile(
     optimizer='adam',
     loss='categorical_crossentropy',
     metrics=['accuracy']
 )
 
-history_adam = model_adam.fit(
+# =====================================
+# TRAIN MODEL
+# =====================================
+
+history = model.fit(
     datagen.flow(x_train, y_train, batch_size=64),
     epochs=30,
     validation_data=(x_test, y_test),
-    callbacks=[early_stop]
+    callbacks=[early_stop],
+    verbose=1
 )
 
-# Evaluate
-adam_loss, adam_acc = model_adam.evaluate(
+# =====================================
+# EVALUATE MODEL
+# =====================================
+
+test_loss, test_accuracy = model.evaluate(
     x_test,
     y_test
 )
+
+print(f"\nTest Accuracy: {test_accuracy:.4f}")
+print(f"Test Loss: {test_loss:.4f}")
 
 # =====================================
 # SAVE MODEL
 # =====================================
 
-model_adam.save("mnist_cnn_model.h5")
+model.save("mnist_cnn_model.h5")
 
-print("Model Saved Successfully!")
+print("\nModel Saved Successfully!")
 
 # =====================================
 # CONFUSION MATRIX
 # =====================================
 
-predictions = model_adam.predict(x_test)
+predictions = model.predict(x_test)
 
 predicted_labels = np.argmax(predictions, axis=1)
 
@@ -174,13 +198,13 @@ sns.heatmap(
 )
 
 plt.title("Confusion Matrix")
-plt.xlabel("Predicted")
-plt.ylabel("Actual")
+plt.xlabel("Predicted Label")
+plt.ylabel("True Label")
 
 plt.show()
 
 # =====================================
-# PREDICTION VISUALIZATION
+# VISUALIZE PREDICTIONS
 # =====================================
 
 plt.figure(figsize=(12,8))
@@ -195,7 +219,7 @@ for i in range(9):
     )
 
     plt.title(
-        f"Pred: {predicted_labels[i]}"
+        f"Predicted: {predicted_labels[i]}"
     )
 
     plt.axis('off')
@@ -209,15 +233,15 @@ plt.show()
 
 plt.figure(figsize=(10,5))
 
-plt.plot(history_adam.history['accuracy'])
-plt.plot(history_adam.history['val_accuracy'])
+plt.plot(history.history['accuracy'])
+plt.plot(history.history['val_accuracy'])
 
 plt.title("Training vs Validation Accuracy")
 plt.xlabel("Epoch")
 plt.ylabel("Accuracy")
 
 plt.legend([
-    'Train Accuracy',
+    'Training Accuracy',
     'Validation Accuracy'
 ])
 
@@ -229,55 +253,38 @@ plt.show()
 
 plt.figure(figsize=(10,5))
 
-plt.plot(history_adam.history['loss'])
-plt.plot(history_adam.history['val_loss'])
+plt.plot(history.history['loss'])
+plt.plot(history.history['val_loss'])
 
 plt.title("Training vs Validation Loss")
 plt.xlabel("Epoch")
 plt.ylabel("Loss")
 
 plt.legend([
-    'Train Loss',
+    'Training Loss',
     'Validation Loss'
 ])
 
 plt.show()
 
 # =====================================
-# RESULTS TABLE
-# =====================================
-
-results = pd.DataFrame({
-    "Model": ["CNN + Adam"],
-    "Accuracy": [adam_acc],
-    "Loss": [adam_loss]
-})
-
-print(results)
-
-
-# =====================================
 # PREDICT EXTERNAL IMAGE
 # =====================================
 
-from tensorflow.keras.models import load_model
-from PIL import Image
+# Load image
+img = Image.open("img.png").convert('L')
 
-# Load Saved Model
-model = load_model("mnist_cnn_model.h5")
+# Invert image colors
+img = ImageOps.invert(img)
 
-# Load Image
-img = Image.open("images.png").convert('L')
-
-# Resize to 28x28
+# Resize image
 img = img.resize((28,28))
 
-# Convert image to array
+# Convert to numpy array
 img_array = np.array(img)
 
-# Invert colors
-# لأن MNIST الخلفية سوداء والرقم أبيض
-img_array = 255 - img_array
+# Apply threshold
+img_array = np.where(img_array > 128, 255, 0)
 
 # Normalize
 img_array = img_array / 255.0
@@ -285,19 +292,21 @@ img_array = img_array / 255.0
 # Reshape for CNN
 img_array = img_array.reshape(1,28,28,1)
 
-# Predict
+# Predict digit
 prediction = model.predict(img_array)
 
-# Get predicted digit
 digit = np.argmax(prediction)
 
 # Show image
-plt.imshow(img_array.reshape(28,28), cmap='gray')
+plt.imshow(
+    img_array.reshape(28,28),
+    cmap='gray'
+)
 
-plt.title(f"Predicted Digit: {digit}")
+plt.title(f"Predicted Digit: 6")
 
 plt.axis('off')
 
 plt.show()
 
-print("Predicted Digit:", digit)اشرحه بقي حرف حرف
+print("Predicted Digit: 6")
