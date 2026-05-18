@@ -1,3 +1,7 @@
 tensorflow
 numpy
 matplotlib
+seaborn
+scikit-learn
+pillow
+pandas
